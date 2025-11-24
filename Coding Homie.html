@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coding Homie IDE + Gemini AI</title>
+    
+    <!-- CodeMirror (Editor) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/eclipse.min.css">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            /* Dark Mode (Default) */
+            --bg-dark: #1e1e1e;
+            --bg-panel: #252526;
+            --bg-header: #2d2d2d;
+            --border: #3e3e3e;
+            --accent: #0e639c;
+            --text: #cccccc;
+            --text-light: #ffffff;
+            --text-muted: #888888;
+            
+            --btn-bg: #3a3a3a;
+            --btn-hover: #4a4a4a;
+            --btn-border: #505050;
+            
+            --font-ui: 'Inter', sans-serif;
+            --font-code: 'Fira Code', 'Consolas', monospace;
+            
+            --ai-color: #8e44ad;
+            --run-color: #2e7d32;
+
+            /* W3Schools Colors for Wiki */
+            --w3-green: #04AA6D;
+            --w3-gray-bg: #E7E9EB;
+            --w3-light-gray: #f1f1f1;
+        }
+
+        body.light-mode {
+            --bg-dark: #f3f4f6;
+            --bg-panel: #ffffff;
+            --bg-header: #ffffff;
+            --border: #e5e7eb;
+            --text: #374151;
+            --text-light: #111827;
+            --text-muted: #6b7280;
+            
+            --btn-bg: #ffffff;
+            --btn-hover: #f3f4f6;
+            --btn-border: #d1d5db;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text);
+            font-family: var(--font-ui);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* HEADER */
+        header {
+            height: 54px;
+            background-color: var(--bg-header);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .logo { font-weight: 600; font-size: 1.1rem; color: var(--text-light); display: flex; align-items: center; gap: 8px; }
+        .logo span { color: #4caf50; }
+
+        .controls { display: flex; gap: 8px; align-items: center; height: 100%; }
+
+        button, select {
+            height: 34px; 
+            padding: 0 12px;
+            border-radius: 6px;
+            border: 1px solid var(--btn-border);
+            background-color: var(--btn-bg);
+            color: var(--text);
+            font-family: var(--font-ui);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.15s ease;
+            outline: none;
+        }
+
+        button:hover, select:hover { background-color: var(--btn-hover); border-color: var(--text-muted); }
+        
+        button.btn-primary { border: none; color: white; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        button.btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        button.btn-primary:active { transform: translateY(0); }
+
+        .btn-run { background-color: var(--run-color) !important; }
+        .btn-ai { background-color: var(--ai-color) !important; }
+
+        button.btn-icon { width: 34px; padding: 0; color: var(--text-muted); }
+        button.btn-icon.active { background-color: rgba(14, 99, 156, 0.15); color: var(--accent); border-color: var(--accent); }
+
+        .separator { width: 1px; height: 20px; background-color: var(--border); margin: 0 4px; }
+
+        /* LAYOUT */
+        .workspace { display: flex; flex: 1; height: calc(100% - 54px); overflow: hidden; position: relative; }
+        .pane { display: flex; flex-direction: column; overflow: hidden; background-color: var(--bg-panel); position: relative; }
+
+        .pane-header {
+            background: var(--bg-panel);
+            padding: 0 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 36px;
+            flex-shrink: 0;
+            user-select: none;
+        }
+
+        .header-controls { display: flex; align-items: center; gap: 4px; }
+        .btn-pane-action { background: transparent; border: none; color: var(--text-muted); width: 28px; height: 28px; border-radius: 4px; padding: 0; }
+        .btn-pane-action:hover { background: var(--btn-hover); color: var(--text); }
+
+        /* TABS */
+        .tab-bar { display: flex; height: 100%; }
+        .tab {
+            padding: 0 15px; cursor: pointer; border-right: 1px solid var(--border); background: var(--bg-panel);
+            color: var(--text-muted); display: flex; align-items: center; font-size: 0.8rem; height: 100%; gap: 6px;
+        }
+        .tab:hover { background: var(--btn-hover); color: var(--text); }
+        .tab.active { background: var(--bg-panel); color: var(--text); border-bottom: 2px solid var(--accent); font-weight: 600; }
+        
+        .tab-content { display: none; flex: 1; overflow: auto; padding: 10px; font-family: var(--font-code); font-size: 13px; color: var(--text); white-space: pre-wrap; }
+        .tab-content.active { display: block; }
+
+        #paneLeft { width: 40%; border-right: 1px solid var(--border); }
+        #paneRight { width: 60%; display: flex; flex-direction: column; }
+        #paneTop { flex: 2; background-color: #ffffff; min-height: 100px; display: flex; flex-direction: column; }
+        #paneBottom { flex: 1; background-color: var(--bg-panel); border-top: 1px solid var(--border); min-height: 50px; }
+
+        /* GUTTERS */
+        .gutter { background-color: var(--bg-dark); z-index: 10; display: flex; align-items: center; justify-content: center; transition: background 0.2s; flex-shrink: 0; }
+        .gutter:hover { background-color: var(--accent); }
+        .gutter-v { width: 8px; cursor: col-resize; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+        .gutter-h { width: 100%; height: 8px; cursor: row-resize; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+        .collapsed { display: none !important; }
+
+        /* EDITOR & MERMAID */
+        .CodeMirror { 
+            flex: 1; 
+            font-family: var(--font-code); 
+            font-size: 14px; 
+            height: auto; 
+            /* Robustly disable ligatures for Fira Code */
+            font-variant-ligatures: none; 
+            font-feature-settings: "calt" 0; 
+        }
+        .mermaid-container { flex: 1; overflow: auto; padding: 20px; display: flex; justify-content: center; align-items: flex-start; background: white; }
+        
+        /* CONSOLE & AI */
+        .console-error { color: #ff6b6b; }
+        .console-log { color: var(--text); display: block; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 2px 0; }
+        
+        .ai-text { color: var(--text); line-height: 1.6; font-family: var(--font-ui); font-size: 14px; }
+        .ai-text ul { list-style: none; padding: 0; }
+        .ai-text li { margin-bottom: 8px; padding: 8px 12px; border-left: 3px solid var(--accent); background: rgba(128,128,128,0.1); border-radius: 0 4px 4px 0; display: flex; gap: 12px; align-items: baseline; }
+        .ai-line { background: var(--btn-bg); color: var(--text-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px; font-family: var(--font-code); flex-shrink: 0; min-width: 50px; text-align: center; border: 1px solid var(--btn-border); }
+        .ai-clickable:hover { text-decoration: underline; cursor: help; filter: brightness(1.2); }
+        .ai-title { color: #a78bfa; font-weight: bold; margin-bottom: 10px; display: block; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+
+        /* SYNTAX HIGHLIGHTING FOR AI EXPLANATIONS */
+        .ai-var { color: #9cdcfe; font-family: var(--font-code); }   
+        .ai-str { color: #ce9178; font-family: var(--font-code); }   
+        .ai-num { color: #b5cea8; font-family: var(--font-code); }   
+        .ai-func { color: #dcdcaa; font-family: var(--font-code); cursor: pointer; } 
+        .ai-key { color: #c586c0; font-family: var(--font-code); cursor: pointer; } 
+        .ai-op { color: #d4d4d4; font-family: var(--font-code); }    
+
+        /* MODALS */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 2000; }
+        .modal { background: var(--bg-panel); padding: 20px; border-radius: 8px; width: 400px; max-width: 90%; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        .modal h3 { margin-bottom: 15px; color: var(--text-light); display: flex; align-items: center; gap: 10px; }
+        .modal p { color: var(--text); margin-bottom: 15px; font-size: 0.9rem; }
+        .modal input { width: 100%; padding: 8px; background: var(--bg-dark); border: 1px solid var(--btn-border); color: var(--text); border-radius: 4px; margin-bottom: 15px; outline: none; }
+        .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; }
+        .loading-text { color: white; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+
+        /* WELCOME MODAL SPECIFIC */
+        .welcome-modal-content { width: 700px; max-width: 95%; padding: 30px; }
+        .welcome-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px; }
+        .welcome-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; }
+        .welcome-title { color: var(--accent); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .welcome-desc { font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; }
+        .welcome-close { position: absolute; top: 20px; right: 20px; cursor: pointer; color: var(--text-muted); background: none; border: none; padding: 5px; }
+        .welcome-close:hover { color: var(--text); }
+        @media (max-width: 600px) { .welcome-grid { grid-template-columns: 1fr; } }
+
+        /* WIKI MODAL */
+        .wiki-modal-content { 
+            background: var(--bg-panel); /* Revert to Dark Theme */
+            color: var(--text); 
+            width: 700px; 
+            max-width: 95%; 
+            padding: 0; 
+            overflow: hidden; 
+            border-radius: 8px; 
+            font-family: var(--font-ui); /* Use main UI font */
+            position: relative; 
+            height: 80vh; 
+            display: flex; 
+            flex-direction: column; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid var(--border);
+        }
+        .close-btn-abs { position: absolute; top: 15px; right: 20px; background: none; border: none; color: var(--text-muted); font-size: 24px; cursor: pointer; z-index: 10; padding: 5px; line-height: 1; transition: color 0.2s; }
+        .close-btn-abs:hover { color: var(--text-light); }
+        
+        .wiki-body { 
+            padding: 40px; 
+            overflow-y: auto; 
+            flex: 1; 
+            color: var(--text); 
+            line-height: 1.6;
+        }
+        
+        /* Typography overrides for Wiki */
+        .wiki-body h1, .wiki-body h2, .wiki-body h3 { color: var(--text-light) !important; font-weight: 600; }
+        .wiki-body p, .wiki-body li { color: var(--text); }
+
+        .w3-heading { font-size: 28px; margin-bottom: 25px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
+        .w3-text { font-size: 16px; margin-bottom: 20px; }
+        
+        /* Code Box Styling - "Stand Out" Design */
+        .w3-code-box, .w3-example-code { 
+            background-color: #101010 !important; 
+            border-radius: 6px; 
+            padding: 15px;               /* Reduced padding */
+            font-family: var(--font-code); 
+            font-size: 13px;             /* Slightly smaller font for better density */
+            margin: 15px 0;              /* Reduced margin */
+            color: #d4d4d4 !important; 
+            border-left: 4px solid var(--accent); 
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+            border-top: 1px solid #333;
+            border-right: 1px solid #333;
+            border-bottom: 1px solid #333;
+            
+            /* CRITICAL FIXES FOR FORMATTING */
+            white-space: pre-wrap;       
+            word-wrap: break-word;       
+            overflow-x: auto;            
+            line-height: 1.4;            /* Tighter line height */
+            tab-size: 4;                 
+        }
+
+        .w3-card { 
+            background-color: rgba(255,255,255,0.03); 
+            padding: 20px; 
+            margin: 30px 0; 
+            border-radius: 8px; 
+            border: 1px solid var(--border); 
+        }
+
+        /* Manual Syntax Highlighting Classes */
+        .token-kw { color: #ff79c6; font-weight: bold; } /* Pink/Purple */
+        .token-func { color: #f1fa8c; } /* Yellow */
+        .token-str { color: #ffb86c; } /* Orange */
+        .token-num { color: #bd93f9; } /* Purple */
+        .token-cmt { color: #6272a4; font-style: italic; } /* Muted Blue/Gray */
+        
+        .wiki-loader { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #e0e0e0; border-top: 4px solid var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Icon sizing overrides */
+        .lucide { width: 16px; height: 16px; }
+        .btn-icon .lucide { width: 18px; height: 18px; }
+    </style>
+</head>
+<body class="dark-mode">
+    
+    <!-- LOADERS & MODALS -->
+    <div id="loader" class="modal-overlay"><div class="loading-text"><div class="spinner"></div><span>Gemini is thinking...</span></div></div>
+
+    <div id="keyModal" class="modal-overlay">
+        <div class="modal">
+            <h3><i data-lucide="key"></i> Setup Gemini AI</h3>
+            <p>Enter your Google Gemini API Key to enable AI features.</p>
+            <input type="password" id="apiKeyInput" placeholder="Paste API Key here...">
+            <div class="modal-buttons">
+                <button onclick="closeKeyModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveApiKey()">Save Key</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WELCOME MODAL -->
+    <div id="welcomeModal" class="modal-overlay">
+        <div class="modal welcome-modal-content" style="position: relative;">
+            <button class="welcome-close" onclick="closeWelcomeModal()"><i data-lucide="x"></i></button>
+            <h3><i data-lucide="info"></i> Welcome to Coding Homie</h3>
+            <div class="welcome-grid">
+                <div class="welcome-card">
+                    <div class="welcome-title"><i data-lucide="code-2"></i> Source Code</div>
+                    <div class="welcome-desc">Write your Python or JavaScript code here. Supports syntax highlighting and auto-indentation.</div>
+                </div>
+                <div class="welcome-card">
+                    <div class="welcome-title"><i data-lucide="git-branch"></i> Live Flowchart</div>
+                    <div class="welcome-desc">Visualize your logic in real-time. Loops and conditions are mapped as you type.</div>
+                </div>
+                <div class="welcome-card">
+                    <div class="welcome-title"><i data-lucide="bot"></i> AI Tutor</div>
+                    <div class="welcome-desc">Click "Explain" to get a beginner-friendly breakdown of your code logic.</div>
+                </div>
+                <div class="welcome-card">
+                    <div class="welcome-title"><i data-lucide="book"></i> Built-in Wiki</div>
+                    <div class="welcome-desc">Click any keyword (e.g., "while") in the AI explanation to open a W3Schools-style guide.</div>
+                </div>
+                <div class="welcome-card">
+                    <div class="welcome-title"><i data-lucide="sparkles"></i> AI Generate</div>
+                    <div class="welcome-desc">Describe a program in plain English, and the AI will write the code for you instantly.</div>
+                </div>
+                <div class="welcome-card">
+                    <div class="welcome-title"><i data-lucide="share-2"></i> Share Code</div>
+                    <div class="welcome-desc">Create a unique URL to share your code snippets with friends. No account required.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="wikiModal" class="modal-overlay">
+        <div class="modal wiki-modal-content">
+            <button class="close-btn-abs" onclick="closeWikiModal()"><i data-lucide="x"></i></button>
+            <div id="wikiBody" class="wiki-body"></div>
+        </div>
+    </div>
+
+    <div id="msgModal" class="modal-overlay">
+        <div class="modal"><h3 id="msgTitle">Message</h3><p id="msgBody">Content</p><div class="modal-buttons"><button class="btn-primary" onclick="closeMsgModal()">OK</button></div></div>
+    </div>
+
+    <div id="inputModal" class="modal-overlay">
+        <div class="modal">
+            <h3 id="inputTitle">Input Required</h3><p id="inputBody">Details:</p><input type="text" id="userTextInput">
+            <div class="modal-buttons"><button onclick="closeInputModal(null)">Cancel</button><button class="btn-primary" onclick="submitInputModal()">Submit</button></div>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <header>
+        <div class="logo">
+            <i data-lucide="cpu" style="color:#4caf50; width:24px; height:24px;"></i>
+            Coding <span>Homie</span>
+        </div>
+        
+        <div class="controls">
+            <button class="btn-icon active" onclick="togglePane('paneLeft')" id="btnViewCode" title="Toggle Source Code">
+                <i data-lucide="code-2"></i>
+            </button>
+            <button class="btn-icon active" onclick="togglePane('paneTop')" id="btnViewFlow" title="Toggle Flowchart">
+                <i data-lucide="git-branch"></i>
+            </button>
+            <button class="btn-icon active" onclick="togglePane('paneBottom')" id="btnViewConsole" title="Toggle Console">
+                <i data-lucide="terminal-square"></i>
+            </button>
+            
+            <div class="separator"></div>
+
+            <button onclick="downloadCode()" title="Download Code File">
+                <i data-lucide="download"></i> <span class="hide-mobile">Save</span>
+            </button>
+            <button onclick="copyShareLink()" title="Copy Share Link">
+                <i data-lucide="share-2"></i> <span class="hide-mobile">Share</span>
+            </button>
+            
+            <button class="btn-icon" onclick="toggleTheme()" title="Switch Theme" id="btnTheme">
+                <i data-lucide="sun"></i>
+            </button>
+            
+            <div class="separator"></div>
+            
+            <select id="aiLang" onchange="saveAiLang()" style="width: 70px;">
+                <option value="English">🇺🇸</option>
+                <option value="Spanish">🇲🇽</option>
+            </select>
+
+            <button onclick="openKeyModal()" title="Set Gemini API Key">
+                <i data-lucide="key"></i>
+            </button>
+            
+            <select id="languageSelect" style="width: 100px;">
+                <option value="python">Python</option>
+                <option value="javascript">JS</option>
+            </select>
+
+            <button class="btn-primary btn-ai" onclick="startAiGenerate()">
+                <i data-lucide="sparkles"></i> <span class="hide-mobile">Generate</span>
+            </button>
+            <button class="btn-primary btn-ai" onclick="startAiExplain()">
+                <i data-lucide="book-open"></i> <span class="hide-mobile">Explain</span>
+            </button>
+            <button class="btn-primary btn-run" onclick="runCode()">
+                <i data-lucide="play"></i> Run
+            </button>
+        </div>
+    </header>
+
+    <div class="workspace" id="workspace">
+        <!-- CODE PANE -->
+        <div class="pane" id="paneLeft">
+            <div class="pane-header">
+                Source Code
+                <div class="header-controls">
+                    <span id="saveStatus" style="font-size: 10px; margin-right: 10px; opacity: 0.7;">Saved</span>
+                    <span id="parseStatus" class="status">Ready</span>
+                </div>
+            </div>
+            <textarea id="codeEditor"></textarea>
+        </div>
+
+        <div class="gutter gutter-v" id="gutterV"></div>
+
+        <!-- RIGHT PANE (Flowchart + Console) -->
+        <div class="pane" id="paneRight">
+            <div class="pane" id="paneTop">
+                <div class="pane-header" style="background: white; border-bottom:1px solid #ddd; color: #555;">
+                    Live Logic Flow
+                    <div class="header-controls">
+                        <button class="btn-pane-action" onclick="zoomOut()"><i data-lucide="minus"></i></button>
+                        <button class="btn-pane-action" onclick="resetZoom()"><i data-lucide="rotate-ccw"></i></button>
+                        <button class="btn-pane-action" onclick="zoomIn()"><i data-lucide="plus"></i></button>
+                        <button class="btn-pane-action" onclick="downloadFlowchart()"><i data-lucide="image"></i></button>
+                    </div>
+                </div>
+                <div id="mermaidGraph" class="mermaid-container"></div>
+            </div>
+
+            <div class="gutter gutter-h" id="gutterH"></div>
+
+            <div class="pane" id="paneBottom">
+                <div class="pane-header" style="padding: 0;">
+                    <div class="tab-bar">
+                        <div class="tab active" id="tabConsole" onclick="switchTab('console')">
+                            <i data-lucide="terminal"></i> Console
+                        </div>
+                        <div class="tab" id="tabAi" onclick="switchTab('ai')">
+                            <i data-lucide="bot"></i> AI Tutor
+                        </div>
+                    </div>
+                    <div class="header-controls" style="padding-right: 10px;">
+                        <button class="btn-pane-action" onclick="clearConsole()"><i data-lucide="trash-2"></i></button>
+                    </div>
+                </div>
+                <div id="consoleContent" class="tab-content active">
+                    <div style="color:var(--text-muted); padding-top:20px; text-align:center;">Press Run to see output</div>
+                </div>
+                <div id="aiContent" class="tab-content" style="font-family: var(--font-ui);">
+                    <div style="color: var(--text-muted); font-style: italic; margin-top: 20px; text-align: center;">
+                        Click "✨ Explain" to analyze your code here.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
+    
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose', flowchart: { curve: 'basis' } });
+        window.mermaid = mermaid;
+    </script>
+
+    <script>
+        const apiKey = ""; // Set by user
+        let editor;
+        let pendingInputResolve = null;
+        let currentZoom = 1.0;
+
+        // --- MERMAID GENERATION LOGIC ---
+        function generateMermaidCode(code, lang) {
+            let rawLines = code.split('\n');
+            let lines = [];
+            
+            // 1. Preprocess: remove comments/empty lines, determine indent
+            rawLines.forEach(line => {
+                let trimmed = line.trim();
+                // Basic filtering for comments
+                if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) return;
+                // JS formatting noise: Just '}' or '};' or '];' should be skipped. 
+                // BUT '} else {' is meaningful logic, so we keep it to handle in the loop.
+                if (trimmed === '}' || trimmed === '};' || trimmed === '];') return;
+                
+                let indent = 0;
+                let match = line.match(/^\s*/);
+                if (match) indent = match[0].length;
+                lines.push({ text: trimmed, indent: indent });
+            });
+
+            // 2. Setup Graph
+            let mermaidCode = "graph TD\n";
+            mermaidCode += `Start([Start])\nEnd([End])\n`;
+            
+            // Updated Colors based on user request
+            mermaidCode += `classDef decision fill:#ffa726,stroke:#333,stroke-width:1px;\n`; // Orange Diamond
+            mermaidCode += `classDef process fill:#42a5f5,stroke:#333,stroke-width:1px,color:white;\n`; // Blue Rect
+            mermaidCode += `classDef io fill:#fff9c4,stroke:#333,stroke-width:1px;\n`; // Yellow IO
+            mermaidCode += `classDef startnode fill:#66bb6a,stroke:#333,stroke-width:1px,color:white;\n`; // Green Start
+            mermaidCode += `classDef endnode fill:#ef5350,stroke:#333,stroke-width:1px,color:white;\n`; // Red End
+            
+            mermaidCode += `class Start startnode;\nclass End endnode;\n`;
+            
+            let edges = [];
+            let loopStack = []; 
+
+            // 3. Build Nodes
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i];
+                let currentId = `N${i}`;
+                
+                // Skip 'else' lines for node creation (they are just edge redirects)
+                // Fix: Robust check for '} else {'
+                if (line.text.startsWith("else") || line.text.startsWith("} else")) continue;
+                
+                // Sanitize label for Mermaid
+                let safeLabel = line.text
+                    .replace(/"/g, "'")
+                    .replace(/[:(){}]/g, '')
+                    .replace(/</g, '＜')
+                    .replace(/>/g, '＞')
+                    .replace(/;/g, '');
+
+                if (safeLabel.length > 30) safeLabel = safeLabel.substring(0, 28) + "...";
+
+                let shapeStart = "[", shapeEnd = "]", style = ":::process";
+                
+                // Identify Node Type
+                if (line.text.match(/^(if|elif|while|for)\b/)) {
+                    shapeStart = "{"; shapeEnd = "}"; style = ":::decision";
+                    safeLabel = safeLabel.replace(/^(if|elif|while|for)\s+/, ""); 
+                } else if (line.text.match(/^(print|console\.|alert|prompt)/)) {
+                    shapeStart = "[/"; shapeEnd = "/]"; style = ":::io";
+                }
+
+                mermaidCode += `${currentId}${shapeStart}"${safeLabel}"${shapeEnd}${style}\n`;
+            }
+
+            // 4. Build Edges
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i];
+                let currentId = `N${i}`;
+                if (line.text.startsWith("else") || line.text.startsWith("} else")) continue;
+
+                // Handle Loop Closure (Back edges)
+                while (loopStack.length > 0) {
+                    let top = loopStack[loopStack.length - 1];
+                    // If current line indent is <= loop start indent, we have exited the loop
+                    if (line.indent <= top.indent) {
+                        // Create Loop Back edge from previous instruction
+                        let prevNodeIdx = i - 1;
+                        // Backtrack if previous was 'else'
+                        while(prevNodeIdx >= 0 && (lines[prevNodeIdx].text.startsWith("else") || lines[prevNodeIdx].text.startsWith("} else"))) prevNodeIdx--;
+                        
+                        if (prevNodeIdx >= 0) edges.push(`N${prevNodeIdx} -- Loop --> N${top.index}`);
+                        edges.push(`N${top.index} -- False --> ${currentId}`);
+                        loopStack.pop();
+                    } else {
+                        break;
+                    }
+                }
+
+                if (i === 0) {
+                    edges.push(`Start --> ${currentId}`);
+                } else {
+                    let prevLine = lines[i-1];
+                    let prevId = `N${i-1}`;
+                    
+                    // IF/WHILE Logic
+                    if (prevLine.text.match(/^(if|while|for|elif)\b/)) {
+                        edges.push(`${prevId} -- True --> ${currentId}`);
+                    }
+                    // ELSE Logic
+                    // Fix: Check for '} else' syntax common in JS
+                    else if (prevLine.text.startsWith("else") || prevLine.text.startsWith("} else")) {
+                        // Connect the IF (that failed) to this line
+                        let j = i - 1;
+                        let indentTarget = prevLine.indent;
+                        while (j >= 0) {
+                            // Find the matching IF at the same indent level
+                            if (lines[j].indent === indentTarget && lines[j].text.match(/^(if|elif)\b/)) {
+                                edges.push(`N${j} -- False --> ${currentId}`);
+                                break;
+                            }
+                            j--;
+                        }
+                    } 
+                    // Standard Flow
+                    else {
+                        // Only connect if we are inside the same block or deeper
+                        // (Simple heuristic: prevents jumping out of if blocks improperly)
+                        if (prevLine.indent <= line.indent) {
+                            edges.push(`${prevId} --> ${currentId}`);
+                        }
+                    }
+                }
+                
+                if (line.text.match(/^(while|for)\b/)) {
+                    loopStack.push({ index: i, indent: line.indent });
+                }
+            }
+
+            // Close remaining loops at the end of code
+            while (loopStack.length > 0) {
+                let top = loopStack.pop();
+                let lastIdx = lines.length - 1;
+                // Check if last line is an else, if so, backtrack
+                 while(lastIdx >= 0 && (lines[lastIdx].text.startsWith("else") || lines[lastIdx].text.startsWith("} else"))) lastIdx--;
+
+                if (lastIdx >= 0) {
+                     edges.push(`N${lastIdx} -- Loop --> N${top.index}`);
+                }
+                edges.push(`N${top.index} -- False --> End`);
+            }
+
+            // Final connection to End
+            if (lines.length > 0) {
+                 let lastLine = lines[lines.length-1];
+                 let lastIdx = lines.length - 1;
+                 
+                 // If last line is else, ignore it
+                 if (lastLine.text.startsWith("else") || lastLine.text.startsWith("} else")) return mermaidCode + edges.join('\n');
+
+                 if (!lastLine.text.match(/^(while|for)\b/)) {
+                    edges.push(`N${lastIdx} --> End`);
+                 }
+            }
+
+            mermaidCode += edges.join('\n');
+            return mermaidCode;
+        }
+
+        async function updateFlowchart() {
+            if (!window.mermaid) return;
+            const code = editor.getValue();
+            const lang = document.getElementById('languageSelect').value;
+            const container = document.getElementById('mermaidGraph');
+            
+            document.getElementById('parseStatus').innerText = "Rendering...";
+            
+            try {
+                const graphDefinition = generateMermaidCode(code, lang);
+                container.innerHTML = ''; // Clear previous
+                const id = `mermaid-${Date.now()}`;
+                const tempDiv = document.createElement('div');
+                tempDiv.id = id;
+                container.appendChild(tempDiv);
+                
+                const { svg } = await window.mermaid.render(id, graphDefinition);
+                container.innerHTML = svg;
+                applyZoom();
+                document.getElementById('parseStatus').innerText = "Ready";
+                document.getElementById('parseStatus').style.color = "var(--text-muted)";
+            } catch (e) {
+                console.warn("Flowchart error:", e);
+                document.getElementById('parseStatus').innerText = "Complex Syntax";
+                document.getElementById('parseStatus').style.color = "#ff6b6b";
+                // Don't clear graph on minor errors to avoid flickering
+            }
+        }
+
+        // --- APP INITIALIZATION ---
+        function initializeApp() {
+            // Theme Restore
+            const savedTheme = localStorage.getItem('logicflow_theme');
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-mode');
+                document.getElementById('btnTheme').innerHTML = '<i data-lucide="moon"></i>';
+            }
+
+            // Editor Init
+            editor = CodeMirror.fromTextArea(document.getElementById("codeEditor"), {
+                mode: "python", 
+                theme: savedTheme === 'light' ? "eclipse" : "dracula", 
+                lineNumbers: true, 
+                indentUnit: 4, 
+                smartIndent: true,
+                extraKeys: {"Tab": function(cm){cm.replaceSelection("    ", "end");}}
+            });
+
+            // Content Restore
+            const savedCode = localStorage.getItem('logicflow_code');
+            const defaultPython = `count = 0
+limit = 5
+
+print("Start Loop")
+
+while count < limit:
+    if count % 2 == 0:
+        print("Even number")
+    else:
+        print("Odd number")
+    
+    count = count + 1
+
+print("Done")`;
+
+            // Check URL param first, then local storage, then default
+            const urlParams = new URLSearchParams(window.location.search);
+            const sharedCode = urlParams.get('code');
+
+            if (sharedCode) {
+                try {
+                    editor.setValue(decodeURIComponent(escape(atob(sharedCode))));
+                } catch(e) { editor.setValue(defaultPython); }
+            } else if (savedCode) {
+                editor.setValue(savedCode);
+            } else {
+                editor.setValue(defaultPython);
+            }
+
+            // Flowchart debounce
+            let timeout;
+            editor.on("change", () => {
+                document.getElementById('saveStatus').innerText = "Unsaved";
+                document.getElementById('parseStatus').innerText = "Parsing...";
+                clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                    updateFlowchart();
+                    localStorage.setItem('logicflow_code', editor.getValue());
+                    document.getElementById('saveStatus').innerText = "Saved";
+                }, 800);
+            });
+            
+            // Initial Render
+            setTimeout(updateFlowchart, 500);
+            initResizers();
+            lucide.createIcons();
+            checkFirstVisit(); // Check if welcome modal needed
+
+            // Click listener for AI keywords
+            document.getElementById('aiContent').addEventListener('click', function(e) {
+                if (e.target.classList.contains('ai-clickable')) {
+                    openWikiModal(e.target.innerText);
+                }
+            });
+
+            // Language Change Listener
+            document.getElementById('languageSelect').addEventListener('change', (e) => {
+                const lang = e.target.value;
+                if (lang === 'python') {
+                    editor.setOption("mode", "python");
+                    editor.setValue(`count = 0\nlimit = 5\n\nprint("Start Loop")\n\nwhile count < limit:\n    if count % 2 == 0:\n        print("Even number")\n    else:\n        print("Odd number")\n    \n    count = count + 1\n\nprint("Done")`);
+                } else {
+                    editor.setOption("mode", "javascript");
+                    editor.setValue(`let count = 0;\nlet limit = 5;\n\nconsole.log("Start Loop");\n\nwhile (count < limit) {\n    if (count % 2 === 0) {\n        console.log("Even number");\n    } else {\n        console.log("Odd number");\n    }\n    count = count + 1;\n}\n\nconsole.log("Done");`);
+                }
+            });
+        }
+
+        // --- UI FUNCTIONS ---
+        function checkFirstVisit() {
+            if (!localStorage.getItem('logicflow_visited')) {
+                document.getElementById('welcomeModal').style.display = 'flex';
+            }
+        }
+        function closeWelcomeModal() {
+            document.getElementById('welcomeModal').style.display = 'none';
+            localStorage.setItem('logicflow_visited', 'true');
+        }
+
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            document.getElementById('btnTheme').innerHTML = isLight ? '<i data-lucide="moon"></i>' : '<i data-lucide="sun"></i>';
+            lucide.createIcons();
+            editor.setOption("theme", isLight ? "eclipse" : "dracula");
+            localStorage.setItem('logicflow_theme', isLight ? 'light' : 'dark');
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            if (tabName === 'console') {
+                document.getElementById('tabConsole').classList.add('active');
+                document.getElementById('consoleContent').classList.add('active');
+            } else {
+                document.getElementById('tabAi').classList.add('active');
+                document.getElementById('aiContent').classList.add('active');
+            }
+        }
+
+        function clearConsole() {
+            document.getElementById("consoleContent").innerHTML = "";
+        }
+
+        // --- ZOOM LOGIC ---
+        function zoomIn() { currentZoom = Math.min(currentZoom + 0.1, 3.0); applyZoom(); }
+        function zoomOut() { currentZoom = Math.max(currentZoom - 0.1, 0.5); applyZoom(); }
+        function resetZoom() { currentZoom = 1.0; applyZoom(); }
+        function applyZoom() {
+            const container = document.getElementById('mermaidGraph');
+            if (container && container.firstElementChild) {
+                const content = container.firstElementChild;
+                content.style.transform = `scale(${currentZoom})`;
+                content.style.transformOrigin = 'top center';
+                content.style.transition = 'transform 0.2s ease';
+            }
+        }
+
+        function downloadCode() {
+            const code = editor.getValue();
+            const lang = document.getElementById('languageSelect').value;
+            const ext = lang === 'python' ? 'py' : 'js';
+            const blob = new Blob([code], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `script.${ext}`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function downloadFlowchart() {
+            const container = document.getElementById('mermaidGraph');
+            const svg = container.querySelector('svg');
+            if (!svg) { showMsg("Error", "No flowchart to download."); return; }
+            
+            const serializer = new XMLSerializer();
+            const source = serializer.serializeToString(svg);
+            const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.download = 'logicflow_diagram.svg';
+            a.href = url;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // --- RESIZERS ---
+        function initResizers() {
+            const workspace = document.getElementById('workspace');
+            const paneLeft = document.getElementById('paneLeft');
+            const paneRight = document.getElementById('paneRight');
+            const paneTop = document.getElementById('paneTop');
+            const gutterV = document.getElementById('gutterV');
+            const gutterH = document.getElementById('gutterH');
+
+            // Vertical Resizer (Left/Right)
+            gutterV.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                document.body.style.cursor = 'col-resize';
+                const onMouseMove = (ev) => {
+                    const totalWidth = workspace.clientWidth;
+                    let newLeftWidth = (ev.clientX / totalWidth) * 100;
+                    if(newLeftWidth < 20) newLeftWidth = 20;
+                    if(newLeftWidth > 80) newLeftWidth = 80;
+                    
+                    paneLeft.style.width = `${newLeftWidth}%`;
+                    paneRight.style.width = `${100 - newLeftWidth}%`;
+                    editor.refresh();
+                };
+                const onMouseUp = () => {
+                    document.body.style.cursor = 'default';
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                };
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+
+            // Horizontal Resizer (Top/Bottom)
+            gutterH.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                document.body.style.cursor = 'row-resize';
+                const onMouseMove = (ev) => {
+                    const totalHeight = paneRight.clientHeight;
+                    // Calculate relative to the paneRight container
+                    const rect = paneRight.getBoundingClientRect();
+                    let newTopHeight = ((ev.clientY - rect.top) / totalHeight) * 100;
+                    
+                    if(newTopHeight < 20) newTopHeight = 20;
+                    if(newTopHeight > 80) newTopHeight = 80;
+                    
+                    paneTop.style.flex = `0 0 ${newTopHeight}%`;
+                };
+                const onMouseUp = () => {
+                    document.body.style.cursor = 'default';
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                };
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        }
+
+        function togglePane(id) {
+            const pane = document.getElementById(id);
+            pane.classList.toggle('collapsed');
+            
+            // Logic to handle hiding gutters
+            if (id === 'paneLeft') {
+                document.getElementById('gutterV').classList.toggle('collapsed');
+                if (pane.classList.contains('collapsed')) {
+                    document.getElementById('paneRight').style.width = '100%';
+                } else {
+                    // Restore previous width (approx)
+                    document.getElementById('paneLeft').style.width = '40%';
+                    document.getElementById('paneRight').style.width = '60%';
+                }
+            } else if (id === 'paneTop' || id === 'paneBottom') {
+                const top = document.getElementById('paneTop');
+                const bot = document.getElementById('paneBottom');
+                const gut = document.getElementById('gutterH');
+                
+                if (top.classList.contains('collapsed') && bot.classList.contains('collapsed')) {
+                     // Both closed? Open one
+                     bot.classList.remove('collapsed');
+                }
+                
+                if (top.classList.contains('collapsed') || bot.classList.contains('collapsed')) {
+                    gut.classList.add('collapsed');
+                    top.style.flex = top.classList.contains('collapsed') ? '0 0 0' : '1 1 auto';
+                } else {
+                    gut.classList.remove('collapsed');
+                    top.style.flex = '0 0 66%';
+                }
+            }
+            setTimeout(() => editor.refresh(), 50);
+        }
+
+        // --- GEMINI AI INTEGRATION ---
+        function getEffectiveKey() { return localStorage.getItem("gemini_api_key") || apiKey; }
+        
+        function saveAiLang() { localStorage.setItem('logicflow_lang', document.getElementById('aiLang').value); }
+
+        function showMsg(title, body) {
+            document.getElementById('msgTitle').innerText = title;
+            document.getElementById('msgBody').innerText = body;
+            document.getElementById('msgModal').style.display = 'flex';
+        }
+        function closeMsgModal() { document.getElementById('msgModal').style.display = 'none'; }
+        
+        function openKeyModal() { 
+            document.getElementById('apiKeyInput').value = localStorage.getItem("gemini_api_key") || ""; 
+            document.getElementById('keyModal').style.display = 'flex'; 
+        }
+        function closeKeyModal() { document.getElementById('keyModal').style.display = 'none'; }
+        function saveApiKey() { 
+            const key = document.getElementById('apiKeyInput').value.trim(); 
+            if (key) { localStorage.setItem("gemini_api_key", key); showMsg("Success", "API Key saved securely."); closeKeyModal(); } 
+        }
+
+        function getUserInput(title, promptText) {
+            return new Promise((resolve) => {
+                document.getElementById('inputTitle').innerText = title;
+                document.getElementById('inputBody').innerText = promptText;
+                document.getElementById('userTextInput').value = "";
+                document.getElementById('inputModal').style.display = 'flex';
+                document.getElementById('userTextInput').focus();
+                pendingInputResolve = resolve;
+            });
+        }
+        function closeInputModal(val) { document.getElementById('inputModal').style.display = 'none'; if(pendingInputResolve) pendingInputResolve(val); pendingInputResolve = null; }
+        function submitInputModal() { closeInputModal(document.getElementById('userTextInput').value); }
+        document.getElementById('userTextInput').addEventListener('keypress', (e) => { if(e.key === 'Enter') submitInputModal(); });
+
+        async function callGemini(promptText) {
+            const key = getEffectiveKey();
+            if (!key) { openKeyModal(); return null; }
+            document.getElementById('loader').style.display = 'flex';
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+                });
+                if(!response.ok) throw new Error("API Error: " + response.statusText);
+                const data = await response.json();
+                document.getElementById('loader').style.display = 'none';
+                return data.candidates[0].content.parts[0].text;
+            } catch (error) {
+                document.getElementById('loader').style.display = 'none';
+                showMsg("AI Error", error.message);
+                return null;
+            }
+        }
+
+        async function startAiGenerate() {
+            const lang = document.getElementById("languageSelect").value;
+            const userIdea = await getUserInput("AI Code Generator", `What ${lang} program should I write?`);
+            if (!userIdea) return;
+            
+            const systemPrompt = `Write a simple, beginner-friendly ${lang} program for: "${userIdea}".
+            RULES: 1. No advanced classes/libraries. 2. Use print/alert for output. 3. Include simple comments. 4. Return ONLY raw code (no markdown).`;
+            
+            const generatedCode = await callGemini(systemPrompt);
+            if (generatedCode) {
+                const cleanCode = generatedCode.replace(/```python|```javascript|```/g, "").trim();
+                editor.setValue(cleanCode);
+            }
+        }
+
+        async function startAiExplain() {
+            const code = editor.getValue();
+            if (!code.trim()) return showMsg("Empty", "Write some code first!");
+            switchTab('ai');
+            const aiContent = document.getElementById("aiContent");
+            aiContent.innerHTML = `<div class="loading-text" style="color:#888; font-size:14px; text-align:center; padding:20px;">AI is analyzing logic...</div>`;
+            
+            const lang = document.getElementById("aiLang").value;
+            const systemPrompt = `Analyze this code for a beginner. Language: ${lang}.
+            Output Format: HTML <ul> list.
+            Items: <li><span class="ai-line">Line #</span> <span class="ai-content">Brief explanation. Wrap keywords in <span class="ai-key ai-clickable">, functions in <span class="ai-func ai-clickable">, vars in <span class="ai-var">.</span></li>
+            Code: ${code}`;
+            
+            const explanation = await callGemini(systemPrompt);
+            if (explanation) {
+                const cleanHtml = explanation.replace(/```html|```/g, "").trim();
+                aiContent.innerHTML = `<span class="ai-title">Logic Breakdown</span><div class="ai-text">${cleanHtml}</div>`;
+            }
+        }
+
+        async function openWikiModal(keyword) {
+            document.getElementById('wikiModal').style.display = 'flex';
+            document.getElementById('wikiBody').innerHTML = `<div class="wiki-loader"><div class="spinner"></div><p>Searching Library for "${keyword}"...</p></div>`;
+            
+            const lang = document.getElementById("languageSelect").value;
+            const aiLang = document.getElementById("aiLang").value;
+            
+            // Updated Prompt: Added strict rules for comment placement and brevity
+            const prompt = `Explain "${keyword}" in ${lang} programming. Style: W3Schools. Language: ${aiLang}.
+            Return raw HTML.
+            Structure:
+            1. <h1 class="w3-heading">Title</h1>
+            2. <p class="w3-text">Definition...</p>
+            3. <div class="w3-card"><h3>Example</h3><div class="w3-example-code">...code...</div></div>
+            
+            CRITICAL FORMATTING RULES:
+            1. Apply these classes to code tokens: <span class="token-kw"> (keywords), <span class="token-str"> (strings), <span class="token-num"> (numbers), <span class="token-cmt"> (comments).
+            2. COMMENTS: Place comments on a NEW LINE ABOVE the code line. Do NOT put comments on the same line.
+            3. BREVITY: Keep comments extremely short (max 5 words).`;
+            
+            const result = await callGemini(prompt);
+            if (result) {
+                let cleanHtml = result.replace(/```html|```/g, "").trim();
+                
+                // FORCE FIX: Regex to specifically target the code block and strip extra newlines
+                cleanHtml = cleanHtml.replace(
+                    /(<div class="w3-example-code">)([\s\S]*?)(<\/div>)/g, 
+                    (match, start, content, end) => {
+                        return start + content.replace(/(\n\s*){2,}/g, '\n').trim() + end;
+                    }
+                );
+
+                document.getElementById('wikiBody').innerHTML = cleanHtml;
+            }
+        }
+        function closeWikiModal() { document.getElementById('wikiModal').style.display = 'none'; }
+
+        // --- EXECUTION ---
+        function runCode() {
+            const code = editor.getValue();
+            const outputDiv = document.getElementById("consoleContent");
+            const lang = document.getElementById("languageSelect").value;
+            switchTab('console');
+            outputDiv.innerHTML = "";
+            outputDiv.innerHTML += `<div style="color:var(--text-muted); margin-bottom:10px;">> Running ${lang}...</div>`;
+
+            if (lang === 'javascript') {
+                try {
+                    const originalLog = console.log;
+                    const originalAlert = window.alert;
+                    console.log = (...args) => args.forEach(a => outputDiv.innerHTML += `<span class="console-log">${a}</span>`);
+                    window.alert = (msg) => outputDiv.innerHTML += `<span class="console-log" style="color:orange">ALERT: ${msg}</span>`;
+                    
+                    new Function(code)();
+                    
+                    console.log = originalLog; 
+                    window.alert = originalAlert;
+                } catch (err) { outputDiv.innerHTML += `<span class="console-error">${err.message}</span>`; }
+            } else {
+                // Python (Skulpt)
+                Sk.configure({ 
+                    output: (text) => outputDiv.innerHTML += `<span class="console-log">${text}</span>`, 
+                    read: (x) => { if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined) throw "File not found: '" + x + "'"; return Sk.builtinFiles["files"][x]; } 
+                });
+                Sk.misceval.asyncToPromise(() => Sk.importMainWithBody("<stdin>", false, code, true))
+                .then(
+                    (mod) => outputDiv.innerHTML += `<div style="color:#2e7d32; margin-top:10px; font-size:12px;">✓ Execution finished</div>`,
+                    (err) => outputDiv.innerHTML += `<span class="console-error">${err.toString()}</span>`
+                );
+            }
+        }
+        
+        function copyShareLink() {
+            const code = editor.getValue();
+            const encoded = btoa(unescape(encodeURIComponent(code)));
+            const url = `${window.location.origin}${window.location.pathname}?code=${encoded}`;
+            navigator.clipboard.writeText(url).then(() => showMsg("Link Copied", "Share this URL with others to load your code."));
+        }
+
+        window.onload = initializeApp;
+    </script>
+</body>
+</html>
